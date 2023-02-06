@@ -48,7 +48,7 @@ def collect_src( patch ):
     
     child_end      = 15                                         # go up to child_end numbers of blended components
     #n_child        = list(range(1,child_end))                   # number of deblended children to use
-    n_child = 5
+    n_child = 8
     num_child      = 1 #len(n_child)                               # number of blended children vector elements
     box_shapes     = []                                         # initialise storage array
     skip_count     = 0                                          # initialise source count
@@ -247,7 +247,7 @@ mpl.rcParams['xtick.minor.visible'] = True
 mpl.rcParams['ytick.minor.visible'] = True
 
 fig = plt.figure(figsize=(9, 9), dpi = 90)
-n_child = 5
+n_child = 8
 
 for i in range(n_child):
     plt.subplot(n_child,5,i*5 + 1)
@@ -289,35 +289,34 @@ plt.show()
 
 
 fig = plt.figure(figsize=(9, 9), dpi = 90)
-n_child = 5
-for i in range(n_child):
-    plt.subplot(n_child,5,i*5 + 1)
+for i in range(1):
+    plt.subplot(1,5,1)
     plt.imshow(df['PSF_g'][i])
     if(i == 0): plt.title('PSF g')
-    name = 'source ' + str(df['object_num'][i])
-    plt.ylabel(name)
+    #name = 'source ' + str(df['object_num'][i])
+    #plt.ylabel(name)
     plt.xticks(fontsize=0)
     plt.yticks(fontsize=0)
 
-    plt.subplot(n_child,5,i*5 + 2)
+    plt.subplot(1,5,2)
     plt.imshow(df['PSF_i'][i], cmap = 'cividis')
     if(i == 0): plt.title('PSF i')
     plt.xticks(fontsize=0)
     plt.yticks(fontsize=0)
 
-    plt.subplot(n_child,5,i*5 + 3)
+    plt.subplot(1,5,3)
     plt.imshow(df['PSF_r'][i], cmap = 'plasma')
     if(i == 0): plt.title('PSF r')
     plt.xticks(fontsize=0)
     plt.yticks(fontsize=0)
 
-    plt.subplot(n_child,5,i*5 + 4)
+    plt.subplot(1,5,4)
     plt.imshow(df['PSF_y'][i], cmap = 'Blues')
     if(i == 0): plt.title('PSF y')
     plt.xticks(fontsize=0)
     plt.yticks(fontsize=0)
 
-    plt.subplot(n_child,5,i*5 + 5)
+    plt.subplot(1,5,5)
     plt.imshow(df['PSF_z'][i], cmap = 'hot')
     if(i == 0): plt.title('PSF z')
     plt.xticks(fontsize=0)

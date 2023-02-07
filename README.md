@@ -1,1 +1,2 @@
-# HSC_galaxy_tools
+# HSC galaxy tools
+Personal storage for useful HSC scripts

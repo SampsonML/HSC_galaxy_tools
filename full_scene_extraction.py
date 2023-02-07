@@ -43,10 +43,15 @@ COLL = "HSC/runs/RC2/w_2022_40/DM-36151"             # current data release
 def collect_src( patch ):
     
     child_end  = 15                                         # go up to child_end numbers of blended components
-    n_child    = 5
-    num_child  = 1                                          # number of blended children vector elements
-    skip_count = 0                                          # initialise source count
+    n_child    = 5  #range(1,child_end)                     # number of blended children
+    num_child  = 1  #len(n_child)                           # number of blended children vector elements
+    skip_count = 0                                          # initialise skip count
     
+    # --------------------------------------------------------------- #
+    # little rountine to allow collect source                         #
+    # to run over all patches in a tract just inputting a             #
+    # single integer between 1 and (amount patches) * (amount tracts) #
+    # --------------------------------------------------------------- #
     # tract 3 9813
     if (patch > 160):
         tract = 9813
@@ -65,11 +70,7 @@ def collect_src( patch ):
         
     patch = patch_tmp
     
-    # for TESTING
-    process = multiprocessing.current_process()
-    # get the pid
-    pid = process.pid
-    #print(f'\n extracting galaxies in HSC patch {patch} of tract {tract} on processor ID {pid}')
+    # Initialise THE BUTLER!!!
     butler = Butler(REPO, collections=[COLL])              # create THE BUTLER
     catalog = butler.get("deepCoadd_deblendedCatalog", tract=tract, patch=patch)
     modelData = butler.get("deepCoadd_scarletModelData", tract=tract, patch=patch)
@@ -81,24 +82,45 @@ def collect_src( patch ):
     exposure = [butler.get("deepCoadd_calexp",tract=tract, patch=patch, band=band)
                   for band in modelData.bands]
     
-    # loop over full catalogue
+    # ----------------------------------------------- #
+    # Loop over full catalogue where num_child is the #
+    # length of the vector of deblended children.     #
+    # Ie parent ID is sorted by how many children it  #
+    # has in the scene so loop over parents with      #
+    # 1 child, then 2...etc                           #
+    # ----------------------------------------------- #
     for k in range(num_child):
-            
 
         # grab all instances of  exactly n_child deblended children
         parent = catalog[catalog["deblend_nChild"]== n_child][:]
-        src_length = 1 #len( parent )
+        src_length = 1 #len( parent ) # set to 1 for testing
         print(f'source number: {src_length}')
 
         for m in range(src_length):              
             
-            #try:
+            # --------------------------------------------------------------- #
+            # Using try is handy when running over full dataset as sometimes  #
+            # there are no sources with n_child deblended children in a given #
+            # patch and I don't want to actually require this. Using try is   #
+            # a bit hacky but will work no issue and acts to jump right to    #
+            # next patch with no issues.                                      #
+            # --------------------------------------------------------------- #
+            #try:   # Commented for testing, I want to make sure it works on a single source
                                 
                 parent_tmp = parent[m]
                 parent_ID = parent_tmp.getId()
-                #print(f'parent id: {parent_ID}')
                 blendData = modelData.blends[parent_tmp.getId()]
                 bbox = Box2I(Point2I(*blendData.xy0), Extent2I(*blendData.extent))
+                
+                # things I need for Scarlet models
+                nBands = len(modelData.bands)
+                blend = mes.io.dataToScarlet(blendData, nBands=nBands)
+                
+                # get bounding box of full scene
+                # not sure if I actually need this as I can just use the scene dims from the cutouts
+                footprint = parent_tmp.getFootprint().getBBox().getDimensions()
+                box_x = footprint.getX()
+                box_y = footprint.getY()
                 
                 # get cutouts in bands
                 cutout_g = exposure[0][bbox]
@@ -106,15 +128,7 @@ def collect_src( patch ):
                 cutout_r = exposure[2][bbox]
                 cutout_y = exposure[3][bbox]
                 cutout_z = exposure[4][bbox]
-                
-                nBands = len(modelData.bands)
-                blend = mes.io.dataToScarlet(blendData, nBands=nBands)
-                
-                # get bounding box of full scene
-                footprint = parent_tmp.getFootprint().getBBox().getDimensions()
-                box_x = footprint.getX()
-                box_y = footprint.getY()
-                    
+            
                 # grab PSFs
                 psf_g = observedPSF[0].computeImage().getArray()
                 psf_i = observedPSF[1].computeImage().getArray()
@@ -122,6 +136,32 @@ def collect_src( patch ):
                 psf_y = observedPSF[3].computeImage().getArray()
                 psf_z = observedPSF[4].computeImage().getArray()
                 
+                # get masks
+                g_mask = cutout_g.mask.getArray()
+                i_mask = cutout_i.mask.getArray()
+                r_mask = cutout_r.mask.getArray()
+                y_mask = cutout_y.mask.getArray()
+                z_mask = cutout_z.mask.getArray()
+                
+                # get variances
+                var_g = cutout_g.variance.getArray()
+                var_i = cutout_i.variance.getArray()
+                var_r = cutout_r.variance.getArray()
+                var_y = cutout_y.variance.getArray()
+                var_z = cutout_z.variance.getArray()
+                
+                # grab scene
+                g_scene = cutout_g.image.getArray()
+                i_scene = cutout_i.image.getArray()
+                r_scene = cutout_r.image.getArray()
+                y_scene = cutout_y.image.getArray()
+                z_scene = cutout_z.image.getArray()
+                
+                # ---------------------------------------------------- #
+                # now we loop over each individual source in the scene #
+                # ie there is n_child sources in each scene            #
+                # this is just to grab individual scarlet blends       #
+                # ---------------------------------------------------- #
                 for l in range(n_child):
                     
                     # sepcify single source
@@ -136,27 +176,6 @@ def collect_src( patch ):
                     r_band = model_bands[2]
                     y_band = model_bands[3]
                     z_band = model_bands[4]
-                    
-                    # get masks
-                    g_mask = cutout_g.mask.getArray()
-                    i_mask = cutout_i.mask.getArray()
-                    r_mask = cutout_r.mask.getArray()
-                    y_mask = cutout_y.mask.getArray()
-                    z_mask = cutout_z.mask.getArray()
-                    
-                    # get variances
-                    var_g = cutout_g.variance.getArray()
-                    var_i = cutout_i.variance.getArray()
-                    var_r = cutout_r.variance.getArray()
-                    var_y = cutout_y.variance.getArray()
-                    var_z = cutout_z.variance.getArray()
-                    
-                    # grab scene
-                    g_scene = cutout_g.image.getArray()
-                    i_scene = cutout_i.image.getArray()
-                    r_scene = cutout_r.image.getArray()
-                    y_scene = cutout_y.image.getArray()
-                    z_scene = cutout_z.image.getArray()
 
                     # create dictionary
                     src_row = {
@@ -204,22 +223,25 @@ def collect_src( patch ):
                             'mask_g', 'mask_i', 'mask_r', 'mask_y', 'mask_z',
                             'scene_g', 'scene_i','scene_r','scene_y','scene_z']
                     
-                    if l == 0:
+                    # First time through, create the dataframe
+                    if m == 0:
                         df = pd.DataFrame(src_row , columns = cols)
                     
+                    # Otherwise, append to the existing dataframe
                     else:
                         df_cur = pd.DataFrame(src_row , columns = cols)
                         df = pd.concat([df, df_cur], ignore_index = True)
-                            
-                
+              
+            # Un-comment this when try is uncommented, nice
+            # to see how many times we skipped a blend                
             #except:
             #    skip_count += 1
-                        
-                
-    # save the data as a pickled pandas df
+
+    #------------------------------------- #            
+    # save the data as a pickled pandas df #
+    # ------------------------------------ #
     df.to_pickle("data_test.pkl")
     print('data saved')
-                
 
 
 # In[2]:

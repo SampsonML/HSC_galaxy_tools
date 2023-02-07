@@ -10,8 +10,6 @@
 '''
 Script to run galaxy source extraction for
 deblended SCARLET sources of galaxies. 
-Designed to run using as many CPU's as
-requested.
 '''
 
 # packages and libraries
@@ -20,7 +18,6 @@ from lsst.afw.image import MultibandExposure
 from lsst.geom import Box2I, Point2I, Extent2I
 import lsst.meas.extensions.scarlet as mes
 from lsst.daf.butler import Butler
-#from tqdm.notebook import tqdm # comment out for script version of code
 from tqdm.auto import tqdm # comment out for script version of code
 import numpy as np
 import matplotlib.pyplot as plt
@@ -39,19 +36,16 @@ import pandas as pd
 # 3 tracts 9617, 9697, 9813
 # 81 patches per tract
 
-REPO           = "/projects/HSC/repo/main"                     # Subaru Huper-Suprime Cam catalogue
-COLL           = "HSC/runs/RC2/w_2022_40/DM-36151"             # current data release
-#butler         = Butler(REPO, collections=[COLL])              # create THE BUTLER
+REPO = "/projects/HSC/repo/main"                     # Subaru Huper-Suprime Cam catalogue
+COLL = "HSC/runs/RC2/w_2022_40/DM-36151"             # current data release
 
-    
+# define function to grab data
 def collect_src( patch ):
     
-    child_end      = 15                                         # go up to child_end numbers of blended components
-    #n_child        = list(range(1,child_end))                   # number of deblended children to use
-    n_child = 8
-    num_child      = 1 #len(n_child)                               # number of blended children vector elements
-    box_shapes     = []                                         # initialise storage array
-    skip_count     = 0                                          # initialise source count
+    child_end  = 15                                         # go up to child_end numbers of blended components
+    n_child    = 5
+    num_child  = 1                                          # number of blended children vector elements
+    skip_count = 0                                          # initialise source count
     
     # tract 3 9813
     if (patch > 160):
@@ -84,10 +78,11 @@ def collect_src( patch ):
     observedPSF = [butler.get("deepCoadd_calexp.psf",tract=tract, patch=patch, band=band)
                   for band in modelData.bands]
     
+    exposure = [butler.get("deepCoadd_calexp",tract=tract, patch=patch, band=band)
+                  for band in modelData.bands]
     
     # loop over full catalogue
-    desc = 'extracting scene tract ' + str(tract) + ' patch ' + str(patch)
-    for k in tqdm(range( num_child ),desc = desc):
+    for k in range(num_child):
             
 
         # grab all instances of  exactly n_child deblended children
@@ -104,6 +99,13 @@ def collect_src( patch ):
                 #print(f'parent id: {parent_ID}')
                 blendData = modelData.blends[parent_tmp.getId()]
                 bbox = Box2I(Point2I(*blendData.xy0), Extent2I(*blendData.extent))
+                
+                # get cutouts in bands
+                cutout_g = exposure[0][bbox]
+                cutout_i = exposure[1][bbox]
+                cutout_r = exposure[2][bbox]
+                cutout_y = exposure[3][bbox]
+                cutout_z = exposure[4][bbox]
                 
                 nBands = len(modelData.bands)
                 blend = mes.io.dataToScarlet(blendData, nBands=nBands)
@@ -128,21 +130,33 @@ def collect_src( patch ):
                     center = sources.center
                     model_bands = sources.get_model()
                     
-                    
-                    # get images per band
+                    # get scarlet models
                     g_band = model_bands[0]
                     i_band = model_bands[1]
                     r_band = model_bands[2]
                     y_band = model_bands[3]
                     z_band = model_bands[4]
                     
-                    # get variances
-                    var_g = g_band.var()
-                    var_i = i_band.var()
-                    var_r = r_band.var()
-                    var_y = y_band.var()
-                    var_z = z_band.var()
+                    # get masks
+                    g_mask = cutout_g.mask.getArray()
+                    i_mask = cutout_i.mask.getArray()
+                    r_mask = cutout_r.mask.getArray()
+                    y_mask = cutout_y.mask.getArray()
+                    z_mask = cutout_z.mask.getArray()
                     
+                    # get variances
+                    var_g = cutout_g.variance.getArray()
+                    var_i = cutout_i.variance.getArray()
+                    var_r = cutout_r.variance.getArray()
+                    var_y = cutout_y.variance.getArray()
+                    var_z = cutout_z.variance.getArray()
+                    
+                    # grab scene
+                    g_scene = cutout_g.image.getArray()
+                    i_scene = cutout_i.image.getArray()
+                    r_scene = cutout_r.image.getArray()
+                    y_scene = cutout_y.image.getArray()
+                    z_scene = cutout_z.image.getArray()
 
                     # create dictionary
                     src_row = {
@@ -154,11 +168,11 @@ def collect_src( patch ):
                                'patch' : [patch],
                                'box_sz': [g_band.shape[1]],
                                'loc'   : [center],
-                               'g'     : [g_band],
-                               'i'     : [i_band],
-                               'r'     : [r_band],
-                               'y'     : [y_band],
-                               'z'     : [z_band],
+                               'scar_g': [g_band],
+                               'scar_i': [i_band],
+                               'scar_r': [r_band],
+                               'scar_y': [y_band],
+                               'scar_z': [z_band],
                                'PSF_g' : [psf_g], 
                                'PSF_i' : [psf_i], 
                                'PSF_r' : [psf_r], 
@@ -169,14 +183,26 @@ def collect_src( patch ):
                                'var_r' : [var_r], 
                                'var_y' : [var_y], 
                                'var_z' : [var_z],
+                               'mask_g': [g_mask],
+                               'mask_i': [i_mask],
+                               'mask_r': [r_mask],
+                               'mask_y': [y_mask],
+                               'mask_z': [z_mask],
+                               'scene_g': [g_scene],
+                               'scene_i': [i_scene],
+                               'scene_r': [r_scene],
+                               'scene_y': [y_scene],
+                               'scene_z': [z_scene],
                                }
                     
                     cols = ['parent_ID','object_num', 'box_x', 
                             'box_y', 'tract','patch',
-                            'box_sz','loc','g','i','r',
-                            'y','z','PSF_g', 'PSF_i', 
+                            'box_sz','loc','scar_g','scar_i','scar_r',
+                            'scar_y','scar_z','PSF_g', 'PSF_i', 
                             'PSF_r', 'PSF_y', 'PSF_z',
-                            'var_g','var_i','var_r', 'var_y', 'var_z']
+                            'var_g','var_i','var_r', 'var_y', 'var_z',
+                            'mask_g', 'mask_i', 'mask_r', 'mask_y', 'mask_z',
+                            'scene_g', 'scene_i','scene_r','scene_y','scene_z']
                     
                     if l == 0:
                         df = pd.DataFrame(src_row , columns = cols)
@@ -202,40 +228,24 @@ def collect_src( patch ):
 # ------------------ #
 # collect scene data #
 # ------------------ #
-
+# turn off warnings for annoying lsst warning
+import warnings
+warnings.filterwarnings("ignore")
 # testing on a single patch
-#collect_src(12)
 collect_src(20)
-#collect_src(220)
-
-
-'''
-print('------------------------')
-print('begin source extraction')
-print('------------------------')
-for i in range(15):
-    try:
-        collect_src(230 + i)
-    except:
-        print('skipped')
-    print('------------------------')
-    print(f'complete patch {i}')
-    print('------------------------')
-'''
 
 
 # In[3]:
 
 
+# Data check
 df = pd.read_pickle("data_test.pkl")
-
-print('box size is: ')
-print(df['box_sz'])
-
-print('centers: ')
-print(df['loc'])
-
+print('------------------------')
 print(df.info())
+
+
+# In[4]:
+
 
 # plot things
 import matplotlib as mpl
@@ -245,13 +255,15 @@ mpl.rcParams['xtick.top'] = True
 mpl.rcParams['ytick.right'] = True
 mpl.rcParams['xtick.minor.visible'] = True
 mpl.rcParams['ytick.minor.visible'] = True
-
+# ------------------------ #
+# check the scarlet models #
+# ------------------------ #
 fig = plt.figure(figsize=(9, 9), dpi = 90)
-n_child = 8
+n_child = 5
 
 for i in range(n_child):
     plt.subplot(n_child,5,i*5 + 1)
-    plt.imshow(df['g'][i])
+    plt.imshow(df['scar_g'][i])
     if(i == 0): plt.title('g-band')
     name = 'source ' + str(df['object_num'][i])
     plt.ylabel(name)
@@ -259,73 +271,194 @@ for i in range(n_child):
     plt.yticks(fontsize=0)
 
     plt.subplot(n_child,5,i*5 + 2)
-    plt.imshow(df['i'][i], cmap = 'cividis')
+    plt.imshow(df['scar_i'][i], cmap = 'cividis')
     if(i == 0): plt.title('i-band')
     plt.xticks(fontsize=0)
     plt.yticks(fontsize=0)
 
     plt.subplot(n_child,5,i*5 + 3)
-    plt.imshow(df['r'][i], cmap = 'plasma')
+    plt.imshow(df['scar_r'][i], cmap = 'plasma')
     if(i == 0): plt.title('r-band')
     plt.xticks(fontsize=0)
     plt.yticks(fontsize=0)
 
     plt.subplot(n_child,5,i*5 + 4)
-    plt.imshow(df['y'][i], cmap = 'Blues')
+    plt.imshow(df['scar_y'][i], cmap = 'Blues')
     if(i == 0): plt.title('y-band')
     plt.xticks(fontsize=0)
     plt.yticks(fontsize=0)
 
     plt.subplot(n_child,5,i*5 + 5)
-    plt.imshow(df['z'][i], cmap = 'hot')
+    plt.imshow(df['scar_z'][i], cmap = 'hot')
     if(i == 0): plt.title('z-band')
     plt.xticks(fontsize=0)
     plt.yticks(fontsize=0)
-    
-plt.show()
 
-
-# In[4]:
-
-
-fig = plt.figure(figsize=(9, 9), dpi = 90)
-for i in range(1):
-    plt.subplot(1,5,1)
-    plt.imshow(df['PSF_g'][i])
-    if(i == 0): plt.title('PSF g')
-    #name = 'source ' + str(df['object_num'][i])
-    #plt.ylabel(name)
-    plt.xticks(fontsize=0)
-    plt.yticks(fontsize=0)
-
-    plt.subplot(1,5,2)
-    plt.imshow(df['PSF_i'][i], cmap = 'cividis')
-    if(i == 0): plt.title('PSF i')
-    plt.xticks(fontsize=0)
-    plt.yticks(fontsize=0)
-
-    plt.subplot(1,5,3)
-    plt.imshow(df['PSF_r'][i], cmap = 'plasma')
-    if(i == 0): plt.title('PSF r')
-    plt.xticks(fontsize=0)
-    plt.yticks(fontsize=0)
-
-    plt.subplot(1,5,4)
-    plt.imshow(df['PSF_y'][i], cmap = 'Blues')
-    if(i == 0): plt.title('PSF y')
-    plt.xticks(fontsize=0)
-    plt.yticks(fontsize=0)
-
-    plt.subplot(1,5,5)
-    plt.imshow(df['PSF_z'][i], cmap = 'hot')
-    if(i == 0): plt.title('PSF z')
-    plt.xticks(fontsize=0)
-    plt.yticks(fontsize=0)
-    
+plt.suptitle('SCARLET models',fontsize=20)    
 plt.show()
 
 
 # In[5]:
+
+
+# -------------- #
+# check the PSFs #
+# -------------- #
+fig = plt.figure(figsize=(12, 6), dpi = 90)
+plt.subplot(1,5,1)
+plt.imshow(df['PSF_g'][0])
+plt.title('PSF g')
+plt.xticks(fontsize=0)
+plt.yticks(fontsize=0)
+
+plt.subplot(1,5,2)
+plt.imshow(df['PSF_i'][0], cmap = 'cividis')
+plt.title('PSF i')
+plt.xticks(fontsize=0)
+plt.yticks(fontsize=0)
+
+plt.subplot(1,5,3)
+plt.imshow(df['PSF_r'][0], cmap = 'plasma')
+plt.title('PSF r')
+plt.xticks(fontsize=0)
+plt.yticks(fontsize=0)
+
+plt.subplot(1,5,4)
+plt.imshow(df['PSF_y'][0], cmap = 'Blues')
+plt.title('PSF y')
+plt.xticks(fontsize=0)
+plt.yticks(fontsize=0)
+
+plt.subplot(1,5,5)
+plt.imshow(df['PSF_z'][0], cmap = 'hot')
+plt.title('PSF z')
+plt.xticks(fontsize=0)
+plt.yticks(fontsize=0)
+    
+plt.show()
+
+
+# In[6]:
+
+
+# -------------------- #
+# check the full scene #
+# -------------------- #
+fig = plt.figure(figsize=(12, 6), dpi = 90)
+plt.subplot(1,5,1)
+plt.imshow(df['scene_g'][0])
+plt.title('scene g')
+plt.xticks(fontsize=0)
+plt.yticks(fontsize=0)
+
+plt.subplot(1,5,2)
+plt.imshow(df['scene_i'][0], cmap = 'cividis')
+plt.title('scene i')
+plt.xticks(fontsize=0)
+plt.yticks(fontsize=0)
+
+plt.subplot(1,5,3)
+plt.imshow(df['scene_r'][0], cmap = 'plasma')
+plt.title('scene r')
+plt.xticks(fontsize=0)
+plt.yticks(fontsize=0)
+
+plt.subplot(1,5,4)
+plt.imshow(df['scene_y'][0], cmap = 'Blues')
+plt.title('scene y')
+plt.xticks(fontsize=0)
+plt.yticks(fontsize=0)
+
+plt.subplot(1,5,5)
+plt.imshow(df['scene_z'][0], cmap = 'hot')
+plt.title('scene z')
+plt.xticks(fontsize=0)
+plt.yticks(fontsize=0)
+    
+plt.show()
+
+
+# In[7]:
+
+
+# ------------------- #
+# check the variances #
+# ------------------- #
+fig = plt.figure(figsize=(12, 6), dpi = 90)
+plt.subplot(1,5,1)
+plt.imshow(df['var_g'][0])
+plt.title('var g')
+plt.xticks(fontsize=0)
+plt.yticks(fontsize=0)
+
+plt.subplot(1,5,2)
+plt.imshow(df['var_i'][0], cmap = 'cividis')
+plt.title('var i')
+plt.xticks(fontsize=0)
+plt.yticks(fontsize=0)
+
+plt.subplot(1,5,3)
+plt.imshow(df['var_r'][0], cmap = 'plasma')
+plt.title('var r')
+plt.xticks(fontsize=0)
+plt.yticks(fontsize=0)
+
+plt.subplot(1,5,4)
+plt.imshow(df['var_y'][0], cmap = 'Blues')
+plt.title('var y')
+plt.xticks(fontsize=0)
+plt.yticks(fontsize=0)
+
+plt.subplot(1,5,5)
+plt.imshow(df['var_z'][0], cmap = 'hot')
+plt.title('var z')
+plt.xticks(fontsize=0)
+plt.yticks(fontsize=0)
+    
+plt.show()
+
+
+# In[8]:
+
+
+# --------------- #
+# check the masks #
+# --------------- #
+fig = plt.figure(figsize=(12, 6), dpi = 90)
+plt.subplot(1,5,1)
+plt.imshow(df['mask_g'][0])
+plt.title('mask g')
+plt.xticks(fontsize=0)
+plt.yticks(fontsize=0)
+
+plt.subplot(1,5,2)
+plt.imshow(df['mask_i'][0], cmap = 'cividis')
+plt.title('mask i')
+plt.xticks(fontsize=0)
+plt.yticks(fontsize=0)
+
+plt.subplot(1,5,3)
+plt.imshow(df['mask_r'][0], cmap = 'plasma')
+plt.title('mask r')
+plt.xticks(fontsize=0)
+plt.yticks(fontsize=0)
+
+plt.subplot(1,5,4)
+plt.imshow(df['mask_y'][0], cmap = 'Blues')
+plt.title('mask y')
+plt.xticks(fontsize=0)
+plt.yticks(fontsize=0)
+
+plt.subplot(1,5,5)
+plt.imshow(df['mask_z'][0], cmap = 'hot')
+plt.title('mask z')
+plt.xticks(fontsize=0)
+plt.yticks(fontsize=0)
+    
+plt.show()
+
+
+# In[9]:
 
 
 import lsst.meas.extensions.scarlet as mes
@@ -378,7 +511,7 @@ blend = mes.io.multibandDataToScarlet(
 )
 
 
-# In[6]:
+# In[10]:
 
 
 # Use the Lupton RGB sinh^-1 mapping to preserve colors
@@ -400,10 +533,4 @@ scarlet.lite.display.show_scene(
     figsize=(8, 8),
 )
 plt.show()
-
-
-# In[ ]:
-
-
-
 

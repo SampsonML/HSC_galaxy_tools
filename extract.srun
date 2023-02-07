@@ -19,4 +19,4 @@ setup lsst_distrib
 
 echo "Running galaxy source extraction"
 
-python extract.py
+python full_scene_extraction.py

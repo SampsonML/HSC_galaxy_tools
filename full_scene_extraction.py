@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
-
-
 # ----------------------- #
 # Grabbing sources script #
 # ----------------------- #
@@ -244,9 +241,6 @@ def collect_src( patch ):
     print('data saved')
 
 
-# In[2]:
-
-
 # ------------------ #
 # collect scene data #
 # ------------------ #
@@ -257,16 +251,10 @@ warnings.filterwarnings("ignore")
 collect_src(20)
 
 
-# In[3]:
-
-
 # Data check
 df = pd.read_pickle("data_test.pkl")
 print('------------------------')
 print(df.info())
-
-
-# In[4]:
 
 
 # plot things
@@ -277,6 +265,8 @@ mpl.rcParams['xtick.top'] = True
 mpl.rcParams['ytick.right'] = True
 mpl.rcParams['xtick.minor.visible'] = True
 mpl.rcParams['ytick.minor.visible'] = True
+
+
 # ------------------------ #
 # check the scarlet models #
 # ------------------------ #
@@ -320,9 +310,6 @@ plt.suptitle('SCARLET models',fontsize=20)
 plt.show()
 
 
-# In[5]:
-
-
 # -------------- #
 # check the PSFs #
 # -------------- #
@@ -358,9 +345,6 @@ plt.xticks(fontsize=0)
 plt.yticks(fontsize=0)
     
 plt.show()
-
-
-# In[6]:
 
 
 # -------------------- #
@@ -400,9 +384,6 @@ plt.yticks(fontsize=0)
 plt.show()
 
 
-# In[7]:
-
-
 # ------------------- #
 # check the variances #
 # ------------------- #
@@ -438,9 +419,6 @@ plt.xticks(fontsize=0)
 plt.yticks(fontsize=0)
     
 plt.show()
-
-
-# In[8]:
 
 
 # --------------- #
@@ -480,9 +458,7 @@ plt.yticks(fontsize=0)
 plt.show()
 
 
-# In[9]:
-
-
+# check scarlet things
 import lsst.meas.extensions.scarlet as mes
 
 tract = df['tract'][0]
@@ -532,8 +508,6 @@ blend = mes.io.multibandDataToScarlet(
     footprint=parent.getFootprint()
 )
 
-
-# In[10]:
 
 
 # Use the Lupton RGB sinh^-1 mapping to preserve colors

@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+# In[1]:
+
+
 # ----------------------- #
 # Grabbing sources script #
 # ----------------------- #
@@ -40,7 +43,7 @@ COLL = "HSC/runs/RC2/w_2022_40/DM-36151"             # current data release
 def collect_src( patch ):
     
     child_end  = 15                                         # go up to child_end numbers of blended components
-    n_child    = 5  #range(1,child_end)                     # number of blended children
+    n_child    = 6  #range(1,child_end)                     # number of blended children
     num_child  = 1  #len(n_child)                           # number of blended children vector elements
     skip_count = 0                                          # initialise skip count
     
@@ -220,14 +223,15 @@ def collect_src( patch ):
                             'mask_g', 'mask_i', 'mask_r', 'mask_y', 'mask_z',
                             'scene_g', 'scene_i','scene_r','scene_y','scene_z']
                     
-                    # First time through, create the dataframe
-                    if m == 0:
-                        df = pd.DataFrame(src_row , columns = cols)
-                    
-                    # Otherwise, append to the existing dataframe
-                    else:
+                    # if df exists append to the existing dataframe
+                    if 'df' in locals():
                         df_cur = pd.DataFrame(src_row , columns = cols)
                         df = pd.concat([df, df_cur], ignore_index = True)
+                    
+                    # otherwise, create the dataframe
+                    else:
+                        df = pd.DataFrame(src_row , columns = cols)
+
               
             # Un-comment this when try is uncommented, nice
             # to see how many times we skipped a blend                
@@ -241,6 +245,9 @@ def collect_src( patch ):
     print('data saved')
 
 
+# In[2]:
+
+
 # ------------------ #
 # collect scene data #
 # ------------------ #
@@ -248,13 +255,19 @@ def collect_src( patch ):
 import warnings
 warnings.filterwarnings("ignore")
 # testing on a single patch
-collect_src(20)
+collect_src(153)
+
+
+# In[3]:
 
 
 # Data check
 df = pd.read_pickle("data_test.pkl")
 print('------------------------')
 print(df.info())
+
+
+# In[4]:
 
 
 # plot things
@@ -265,13 +278,11 @@ mpl.rcParams['xtick.top'] = True
 mpl.rcParams['ytick.right'] = True
 mpl.rcParams['xtick.minor.visible'] = True
 mpl.rcParams['ytick.minor.visible'] = True
-
-
 # ------------------------ #
 # check the scarlet models #
 # ------------------------ #
-fig = plt.figure(figsize=(9, 9), dpi = 90)
-n_child = 5
+fig = plt.figure(figsize=(9, 9), dpi = 130)
+n_child = 6
 
 for i in range(n_child):
     plt.subplot(n_child,5,i*5 + 1)
@@ -310,10 +321,13 @@ plt.suptitle('SCARLET models',fontsize=20)
 plt.show()
 
 
+# In[5]:
+
+
 # -------------- #
 # check the PSFs #
 # -------------- #
-fig = plt.figure(figsize=(12, 6), dpi = 90)
+fig = plt.figure(figsize=(12, 6), dpi = 130)
 plt.subplot(1,5,1)
 plt.imshow(df['PSF_g'][0])
 plt.title('PSF g')
@@ -347,10 +361,13 @@ plt.yticks(fontsize=0)
 plt.show()
 
 
+# In[6]:
+
+
 # -------------------- #
 # check the full scene #
 # -------------------- #
-fig = plt.figure(figsize=(12, 6), dpi = 90)
+fig = plt.figure(figsize=(12, 6), dpi = 130)
 plt.subplot(1,5,1)
 plt.imshow(df['scene_g'][0])
 plt.title('scene g')
@@ -384,10 +401,13 @@ plt.yticks(fontsize=0)
 plt.show()
 
 
+# In[7]:
+
+
 # ------------------- #
 # check the variances #
 # ------------------- #
-fig = plt.figure(figsize=(12, 6), dpi = 90)
+fig = plt.figure(figsize=(12, 6), dpi = 130)
 plt.subplot(1,5,1)
 plt.imshow(df['var_g'][0])
 plt.title('var g')
@@ -421,10 +441,13 @@ plt.yticks(fontsize=0)
 plt.show()
 
 
+# In[8]:
+
+
 # --------------- #
 # check the masks #
 # --------------- #
-fig = plt.figure(figsize=(12, 6), dpi = 90)
+fig = plt.figure(figsize=(12, 6), dpi = 130)
 plt.subplot(1,5,1)
 plt.imshow(df['mask_g'][0])
 plt.title('mask g')
@@ -458,7 +481,9 @@ plt.yticks(fontsize=0)
 plt.show()
 
 
-# check scarlet things
+# In[9]:
+
+
 import lsst.meas.extensions.scarlet as mes
 
 tract = df['tract'][0]
@@ -508,6 +533,8 @@ blend = mes.io.multibandDataToScarlet(
     footprint=parent.getFootprint()
 )
 
+
+# In[10]:
 
 
 # Use the Lupton RGB sinh^-1 mapping to preserve colors
